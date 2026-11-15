@@ -2,11 +2,14 @@ package com.ratelimiter.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -21,7 +24,7 @@ public class SecurityConfig {
 	    }
 	 
 	 @Bean
-	    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+	    public Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
 
 	        JwtGrantedAuthoritiesConverter authoritiesConverter =
 	                new JwtGrantedAuthoritiesConverter();
@@ -29,12 +32,12 @@ public class SecurityConfig {
 	        authoritiesConverter.setAuthoritiesClaimName("roles");
 	        authoritiesConverter.setAuthorityPrefix("ROLE_");
 
-	        JwtAuthenticationConverter converter =
+	        JwtAuthenticationConverter authenticationConverter =
 	                new JwtAuthenticationConverter();
 
-	        converter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+	        authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
 
-	        return converter;
+	        return authenticationConverter;
 	    }
 
 	    @Bean
@@ -51,7 +54,9 @@ public class SecurityConfig {
 
 	            .authorizeHttpRequests(auth -> auth
 	                .requestMatchers(HttpMethod.POST,
-	                        "/auth/register", "/auth/login").permitAll()
+	                        "/auth/register", "/auth/login","/redis/set").permitAll()
+	                .requestMatchers(HttpMethod.GET, "/redis/get").permitAll()
+	                .requestMatchers(HttpMethod.DELETE, "/redis/delete").permitAll()
 	                .requestMatchers("/admin/**").hasRole("ADMIN")
 	                .requestMatchers("/api/**").authenticated()
 	                .anyRequest().authenticated())

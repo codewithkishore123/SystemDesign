@@ -2,6 +2,7 @@ package com.ratelimiter;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
 
 @SpringBootApplication
 public class RateLimiterApplication {
@@ -10,4 +11,9 @@ public class RateLimiterApplication {
 		SpringApplication.run(RateLimiterApplication.class, args);
 	}
 
+	
+	   @GetMapping("/health-check")
+	    public String healthCheck() {
+	        return "Application is running!";
+	    }
 }
