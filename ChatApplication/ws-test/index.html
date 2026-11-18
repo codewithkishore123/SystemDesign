@@ -1,0 +1,134 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Application WebSocket Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.1.1/bundles/stomp.umd.min.js"></script>
+</head>
+<body>
+    <h2>Chat Application - STOMP Test</h2>
+
+    <label>JWT Token:</label><br>
+    <textarea id="token" rows="4" cols="70"
+        placeholder="Paste JWT token"></textarea>
+    <br><br>
+
+    <label>Conversation UUID:</label><br>
+    <input id="conversationId" size="50"
+        placeholder="Enter conversation UUID">
+    <br><br>
+
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+
+    <hr>
+
+    <h3>Send Message</h3>
+    <input id="message" size="50"
+        placeholder="Enter message">
+    <button onclick="sendMessage()">Send</button>
+
+    <hr>
+
+    <h3>Received Messages</h3>
+    <pre id="output"></pre>
+
+    <script>
+        let client;
+
+        function log(message) {
+            document.getElementById("output").textContent +=
+                message + "\n\n";
+        }
+
+        function connect() {
+            const token = document.getElementById("token").value.trim();
+
+            if (!token) {
+                alert("Enter JWT token");
+                return;
+            }
+
+            client = new StompJs.Client({
+                brokerURL: "ws://localhost:8080/ws",
+
+                connectHeaders: {
+                    Authorization: "Bearer " + token
+                },
+
+                reconnectDelay: 0,
+
+                onConnect: function () {
+                    log("STOMP CONNECTED successfully!");
+
+                    client.subscribe(
+                        "/user/queue/messages",
+                        function (frame) {
+                            log("MESSAGE RECEIVED:\n" + frame.body);
+                        }
+                    );
+
+                    client.subscribe(
+                        "/user/queue/errors",
+                        function (frame) {
+                            log("MESSAGE ERROR:\n" + frame.body);
+                        }
+                    );
+
+                    log("Subscribed to personal message queue");
+                },
+
+                onStompError: function (frame) {
+                    log("STOMP ERROR:\n" + frame.body);
+                },
+
+                onWebSocketError: function (error) {
+                    log("WEBSOCKET ERROR:\n" + error);
+                },
+
+                onDisconnect: function () {
+                    log("Disconnected");
+                }
+            });
+
+            client.activate();
+        }
+
+        function sendMessage() {
+            if (!client || !client.connected) {
+                alert("Connect first");
+                return;
+            }
+
+            const conversationId =
+                document.getElementById("conversationId").value.trim();
+
+            const content =
+                document.getElementById("message").value.trim();
+
+            if (!conversationId || !content) {
+                alert("Enter conversation ID and message");
+                return;
+            }
+
+            client.publish({
+                destination: "/app/chat.send",
+                body: JSON.stringify({
+                    conversationId: conversationId,
+                    content: content
+                })
+            });
+
+            log("Message sent: " + content);
+
+            document.getElementById("message").value = "";
+        }
+
+        function disconnect() {
+            if (client) {
+                client.deactivate();
+            }
+        }
+    </script>
+</body>
+</html>

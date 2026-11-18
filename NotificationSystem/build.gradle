@@ -24,6 +24,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
@@ -41,4 +42,7 @@ tasks.named('test') {
 }
 tasks.named('bootJar') {
     archiveFileName = 'app.jar'
+}
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.add("-parameters")
 }
