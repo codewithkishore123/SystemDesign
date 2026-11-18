@@ -72,6 +72,12 @@ public class Notification {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+    
+    @Column(name = "failure_reason", columnDefinition = "TEXT")
+    private String failureReason;
+
+    @Column(name = "failed_at")
+    private LocalDateTime failedAt;
 
     @PrePersist
     public void onCreate() {
@@ -190,6 +196,22 @@ public class Notification {
 
 	public void setUpdatedAt(LocalDateTime updatedAt) {
 		this.updatedAt = updatedAt;
+	}
+
+	public String getFailureReason() {
+		return failureReason;
+	}
+
+	public void setFailureReason(String failureReason) {
+		this.failureReason = failureReason;
+	}
+
+	public LocalDateTime getFailedAt() {
+		return failedAt;
+	}
+
+	public void setFailedAt(LocalDateTime failedAt) {
+		this.failedAt = failedAt;
 	}
 
 	@Override
