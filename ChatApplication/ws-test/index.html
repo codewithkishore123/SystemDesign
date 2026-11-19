@@ -1,134 +1,321 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Chat Application WebSocket Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Application - WebSocket Test</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.1.1/bundles/stomp.umd.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        input, textarea, button {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            margin: 8px 0;
+        }
+
+        textarea {
+            min-height: 70px;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .buttons button {
+            flex: 1;
+        }
+
+        #status {
+            font-weight: bold;
+            margin: 15px 0;
+        }
+
+        #messages {
+            border: 1px solid #ccc;
+            padding: 15px;
+            min-height: 200px;
+            max-height: 350px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
 </head>
+
 <body>
-    <h2>Chat Application - STOMP Test</h2>
 
-    <label>JWT Token:</label><br>
-    <textarea id="token" rows="4" cols="70"
-        placeholder="Paste JWT token"></textarea>
-    <br><br>
+<h2>Chat Application - WebSocket Test</h2>
 
-    <label>Conversation UUID:</label><br>
-    <input id="conversationId" size="50"
-        placeholder="Enter conversation UUID">
-    <br><br>
+<label>JWT Access Token</label>
+<textarea id="token" placeholder="Paste your JWT token here"></textarea>
 
+<label>Conversation UUID</label>
+<input
+    type="text"
+    id="conversationId"
+    placeholder="Enter conversation UUID"
+/>
+
+<div class="buttons">
     <button onclick="connect()">Connect</button>
     <button onclick="disconnect()">Disconnect</button>
+</div>
 
-    <hr>
+<p id="status">Status: Disconnected</p>
 
-    <h3>Send Message</h3>
-    <input id="message" size="50"
-        placeholder="Enter message">
-    <button onclick="sendMessage()">Send</button>
+<hr>
 
-    <hr>
+<h3>Send Message</h3>
 
-    <h3>Received Messages</h3>
-    <pre id="output"></pre>
+<textarea
+    id="message"
+    placeholder="Enter your message"
+></textarea>
 
-    <script>
-        let client;
+<button onclick="sendMessage()">Send Message</button>
 
-        function log(message) {
-            document.getElementById("output").textContent +=
-                message + "\n\n";
+<hr>
+
+<h3>Received Messages</h3>
+
+<div id="messages"></div>
+
+<script>
+    let stompClient = null;
+    let heartbeatInterval = null;
+
+    const HEARTBEAT_INTERVAL = 20000;
+
+    function log(message) {
+        const messagesDiv = document.getElementById("messages");
+
+        const time = new Date().toLocaleTimeString();
+
+        messagesDiv.textContent += `[${time}] ${message}\n`;
+
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    function updateStatus(message) {
+        document.getElementById("status").textContent =
+            "Status: " + message;
+    }
+
+    function getToken() {
+        let token = document.getElementById("token").value.trim();
+
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
         }
 
-        function connect() {
-            const token = document.getElementById("token").value.trim();
+        return token;
+    }
 
-            if (!token) {
-                alert("Enter JWT token");
-                return;
-            }
+    function connect() {
+        const token = getToken();
 
-            client = new StompJs.Client({
-                brokerURL: "ws://localhost:8080/ws",
-
-                connectHeaders: {
-                    Authorization: "Bearer " + token
-                },
-
-                reconnectDelay: 0,
-
-                onConnect: function () {
-                    log("STOMP CONNECTED successfully!");
-
-                    client.subscribe(
-                        "/user/queue/messages",
-                        function (frame) {
-                            log("MESSAGE RECEIVED:\n" + frame.body);
-                        }
-                    );
-
-                    client.subscribe(
-                        "/user/queue/errors",
-                        function (frame) {
-                            log("MESSAGE ERROR:\n" + frame.body);
-                        }
-                    );
-
-                    log("Subscribed to personal message queue");
-                },
-
-                onStompError: function (frame) {
-                    log("STOMP ERROR:\n" + frame.body);
-                },
-
-                onWebSocketError: function (error) {
-                    log("WEBSOCKET ERROR:\n" + error);
-                },
-
-                onDisconnect: function () {
-                    log("Disconnected");
-                }
-            });
-
-            client.activate();
+        if (!token) {
+            alert("Please enter your JWT token.");
+            return;
         }
 
-        function sendMessage() {
-            if (!client || !client.connected) {
-                alert("Connect first");
-                return;
-            }
-
-            const conversationId =
-                document.getElementById("conversationId").value.trim();
-
-            const content =
-                document.getElementById("message").value.trim();
-
-            if (!conversationId || !content) {
-                alert("Enter conversation ID and message");
-                return;
-            }
-
-            client.publish({
-                destination: "/app/chat.send",
-                body: JSON.stringify({
-                    conversationId: conversationId,
-                    content: content
-                })
-            });
-
-            log("Message sent: " + content);
-
-            document.getElementById("message").value = "";
+        if (stompClient && stompClient.active) {
+            log("A WebSocket connection is already active.");
+            return;
         }
 
-        function disconnect() {
-            if (client) {
-                client.deactivate();
+        stompClient = new StompJs.Client({
+
+            brokerURL: "ws://localhost:8080/ws",
+
+            connectHeaders: {
+                Authorization: "Bearer " + token
+            },
+
+            reconnectDelay: 5000,
+
+            heartbeatIncoming: 10000,
+            heartbeatOutgoing: 10000,
+
+            debug: function (message) {
+                console.log(message);
+            },
+
+            onConnect: function (frame) {
+
+                updateStatus("Connected");
+
+                log("WebSocket connected successfully.");
+
+                // Subscribe to messages sent to the logged-in user.
+                stompClient.subscribe(
+                    "/user/queue/messages",
+                    function (message) {
+
+                        log(
+                            "Received message: " + message.body
+                        );
+                    }
+                );
+
+                log("Subscribed to /user/queue/messages");
+
+                // Start Redis presence heartbeat.
+                startHeartbeat();
+            },
+
+            onStompError: function (frame) {
+
+                updateStatus("STOMP Error");
+
+                log(
+                    "STOMP error: " +
+                    frame.headers["message"]
+                );
+
+                log(frame.body);
+            },
+
+            onWebSocketError: function (error) {
+
+                log("WebSocket error occurred.");
+
+                console.error(error);
+            },
+
+            onWebSocketClose: function () {
+
+                stopHeartbeat();
+
+                updateStatus("Disconnected");
+
+                log("WebSocket connection closed.");
             }
+        });
+
+        stompClient.activate();
+
+        updateStatus("Connecting...");
+    }
+
+    function startHeartbeat() {
+
+        // Send the first heartbeat immediately.
+        sendHeartbeat();
+
+        // Send another heartbeat every 20 seconds.
+        heartbeatInterval = setInterval(function () {
+
+            sendHeartbeat();
+
+        }, HEARTBEAT_INTERVAL);
+
+        log("Presence heartbeat started.");
+    }
+
+    function sendHeartbeat() {
+
+        if (!stompClient || !stompClient.connected) {
+            return;
         }
-    </script>
+
+        stompClient.publish({
+
+            destination: "/app/presence.heartbeat",
+
+            body: JSON.stringify({
+                type: "HEARTBEAT"
+            })
+
+        });
+
+        log("Presence heartbeat sent.");
+    }
+
+    function stopHeartbeat() {
+
+        if (heartbeatInterval !== null) {
+
+            clearInterval(heartbeatInterval);
+
+            heartbeatInterval = null;
+
+            log("Presence heartbeat stopped.");
+        }
+    }
+
+    function sendMessage() {
+
+        if (!stompClient || !stompClient.connected) {
+            alert("Please connect to WebSocket first.");
+            return;
+        }
+
+        const conversationId =
+            document.getElementById("conversationId").value.trim();
+
+        const content =
+            document.getElementById("message").value.trim();
+
+        if (!conversationId) {
+            alert("Please enter the conversation UUID.");
+            return;
+        }
+
+        if (!content) {
+            alert("Please enter a message.");
+            return;
+        }
+
+        const payload = {
+            conversationId: conversationId,
+            content: content
+        };
+
+        stompClient.publish({
+
+            destination: "/app/chat.send",
+
+            body: JSON.stringify(payload)
+
+        });
+
+        log("Message sent: " + content);
+
+        document.getElementById("message").value = "";
+    }
+
+    function disconnect() {
+
+        stopHeartbeat();
+
+        if (stompClient) {
+
+            stompClient.deactivate();
+
+            stompClient = null;
+
+            updateStatus("Disconnected");
+
+            log("Disconnect requested.");
+        }
+    }
+
+</script>
+
 </body>
 </html>
